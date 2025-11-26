@@ -101,7 +101,16 @@ else()
 endif()
 
 # Main executable
-add_executable(vulkan_app src/main.cpp)
+add_executable(vulkan_app
+	src/main.cpp
+	src/instance.cpp
+)
+target_sources(vulkan_app
+  PUBLIC
+  FILE_SET cxx_modules TYPE CXX_MODULES
+  FILES
+  src/instance.ixx
+)
 set_target_properties(vulkan_app PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 target_link_libraries(vulkan_app Vulkan::cppm glfw)
