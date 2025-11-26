@@ -104,12 +104,14 @@ endif()
 add_executable(vulkan_app
 	src/main.cpp
 	src/instance.cpp
+	src/device.cpp
 )
 target_sources(vulkan_app
   PUBLIC
   FILE_SET cxx_modules TYPE CXX_MODULES
   FILES
   src/instance.ixx
+  src/device.ixx
 )
 set_target_properties(vulkan_app PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
