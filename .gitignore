@@ -1,0 +1,5 @@
+.cache/
+[Bb]in/
+[Bb]uild/
+
+compile[_-]commands.json
