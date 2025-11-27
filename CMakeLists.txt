@@ -107,6 +107,7 @@ add_executable(vulkan_app
 	src/device.cpp
 	src/window.cpp
 	src/swapchain.cpp
+	src/pipeline.cpp
 )
 target_sources(vulkan_app
   PUBLIC

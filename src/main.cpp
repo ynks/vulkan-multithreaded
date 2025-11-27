@@ -16,8 +16,8 @@ public:
 	}
 
 private:
-	std::unique_ptr<Window> m_window;
 	std::unique_ptr<vulkan::Instance> m_instance;
+	std::unique_ptr<Window> m_window;
 	std::unique_ptr<vulkan::Device> m_device;
 	std::unique_ptr<vulkan::Swapchain> m_swapchain;
 	std::unique_ptr<vulkan::Pipeline> m_pipeline;

@@ -4,4 +4,4 @@
 
 compile[_-]commands.json
 
-*.spirv
+*.spv

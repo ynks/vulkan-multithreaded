@@ -26,6 +26,7 @@ Window::Window() {
 }
 
 Window::~Window() {
+	m_surface.clear();
 	if (m_rawWindow) {
 		glfwDestroyWindow(m_rawWindow);
 	}

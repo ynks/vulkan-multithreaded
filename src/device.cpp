@@ -217,8 +217,12 @@ void Device::CreateLogicalDevice() {
 	vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT extDynamicState{
 		.extendedDynamicState = true
 	};
-	vk::PhysicalDeviceVulkan13Features vk13Features{
+	vk::PhysicalDeviceVulkan11Features vk11Features{
 		.pNext = &extDynamicState,
+		.shaderDrawParameters = true
+	};
+	vk::PhysicalDeviceVulkan13Features vk13Features{
+		.pNext = &vk11Features,
 		.dynamicRendering = true
 	};
 	vk::PhysicalDeviceFeatures2 features2{
