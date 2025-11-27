@@ -38,6 +38,11 @@ public:
 	[[nodiscard]] /// @brief Get present queue
 	static vk::raii::Queue* presentQueue() { return &device()->m_presentQueue; }
 
+	[[nodiscard]]
+	static uint32_t graphicsIndex() { return device()->m_graphicsFamilyIndex; }
+	[[nodiscard]]
+	static uint32_t presentIndex() { return device()->m_presentFamilyIndex; }
+
 private:
 	void PickPhysicalDevice();
 	void CreateLogicalDevice();
@@ -47,6 +52,8 @@ private:
 	static Device* m_thisDevice;
 	vk::raii::PhysicalDevice m_physicalDevice = nullptr;
 	vk::raii::Device m_device = nullptr;
+	uint32_t m_graphicsFamilyIndex;
+	uint32_t m_presentFamilyIndex;
 	vk::raii::Queue m_graphicsQueue = nullptr;
 	vk::raii::Queue m_presentQueue = nullptr;
 };

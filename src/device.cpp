@@ -248,6 +248,8 @@ void Device::CreateLogicalDevice() {
 	// Retrieve graphics and present queues
 	m_graphicsQueue = vk::raii::Queue(m_device, graphics_index, 0);
 	m_presentQueue = vk::raii::Queue(m_device, present_index, 0);
+	m_graphicsFamilyIndex = graphics_index;
+	m_presentFamilyIndex = present_index;
 
 	std::println("Created Vulkan Device");
 }

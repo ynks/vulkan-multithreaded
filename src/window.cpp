@@ -64,3 +64,11 @@ void Window::pollEvents() {
 	glfwPollEvents();
 }
 
+
+std::pair<uint32_t, uint32_t> Window::framebufferSize() {
+	int width, height;
+	glfwGetFramebufferSize(m_rawWindow, &width, &height);
+
+	return { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
+}
+

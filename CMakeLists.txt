@@ -106,6 +106,7 @@ add_executable(vulkan_app
 	src/instance.cpp
 	src/device.cpp
 	src/window.cpp
+	src/swapchain.cpp
 )
 target_sources(vulkan_app
   PUBLIC
@@ -114,6 +115,7 @@ target_sources(vulkan_app
   src/instance.ixx
   src/device.ixx
 	src/window.ixx
+	src/swapchain.ixx
 )
 set_target_properties(vulkan_app PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})

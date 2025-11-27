@@ -28,6 +28,8 @@ public:
 	[[nodiscard]] /// @brief Get surface
 	static vk::raii::SurfaceKHR* surface() { return &window()->m_surface; }
 
+	std::pair<uint32_t, uint32_t> framebufferSize();
+
 private:
 	static Window* m_instance;
 	GLFWwindow* m_rawWindow;
