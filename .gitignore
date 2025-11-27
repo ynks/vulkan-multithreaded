@@ -3,3 +3,5 @@
 [Bb]uild/
 
 compile[_-]commands.json
+
+*.spirv

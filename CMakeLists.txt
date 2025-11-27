@@ -116,6 +116,7 @@ target_sources(vulkan_app
   src/device.ixx
 	src/window.ixx
 	src/swapchain.ixx
+	src/pipeline.ixx
 )
 set_target_properties(vulkan_app PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
@@ -145,3 +146,23 @@ add_custom_command(TARGET vulkan_app POST_BUILD
     ${CMAKE_SOURCE_DIR}/compile_commands.json
   COMMENT "Copying compile_commands.json to project root"
 )
+
+# function(add_slang_shader_target TARGET)
+# 	cmake_parse_arguments("SHADER" "" "" "SOURCES" ${ARGN})
+# 	set (SHADERS_DIR ${CMAKE_CURRENT_DIRECTORY})
+# 	set (ENTRYPOINTS -entry vertMain -entry fragMain)
+# 	add_custom_command(
+# 		OUTPUT ${SHADERS_DIR}
+# 		COMMAND ${SLANGC_EXECUTABLE} ${SHADER_SOURCES} -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name ${ENTRYPOINTS} -o slang.spv
+# 		WORKING_DIRECTORY ${SHADERS_DIR}
+# 		DEPENDS ${SHADERS_DIR} ${SHADERS_SOURCES}
+# 		COMMENT "Compiling slang Shaders"
+# 		VERBATIM
+# 	)
+# 	add_custom_target(${TARGET} DEPENDS ${SHADERS_DIR}/slang.spv)
+# endfunction()
+#
+# add_slang_shader_target(vulkan_app SOURCES
+# 	shaders/triangle.slang
+# )
+
