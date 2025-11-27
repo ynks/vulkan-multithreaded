@@ -29,6 +29,9 @@ public:
 	[[nodiscard]] /// @brief Exposes vk::raii::Device
 	static vk::raii::Device* get() { return &device()->m_device; }
 
+	[[nodiscard]] /// @brief Get physical device
+	static vk::raii::PhysicalDevice* physicalDevice() { return &device()->m_physicalDevice; }
+
 	[[nodiscard]] /// @brief Get graphics queue
 	static vk::raii::Queue* queue() { return &device()->m_graphicsQueue; }
 

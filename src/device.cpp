@@ -7,6 +7,7 @@ module;
 module vulkan.device;
 
 import vulkan.instance;
+import window;
 
 namespace vulkan {
 
@@ -132,6 +133,7 @@ std::expected<uint32_t, DeviceError> Device::GetQueueFamily(vk::QueueFlagBits ty
 	if (m_physicalDevice == nullptr) throw std::runtime_error("Trying to get QueueFamily without a device");
 
 	std::vector queue_family_properties = m_physicalDevice.getQueueFamilyProperties();
+
 	
 	// finds the first queue with the target type
 	auto target = std::find_if(queue_family_properties.begin(), queue_family_properties.end(), [type](const auto& qfp){
@@ -162,14 +164,15 @@ void Device::CreateLogicalDevice() {
 	};
 
 	// Enable features
-	vk::StructureChain<
-		vk::PhysicalDeviceFeatures2,
-		vk::PhysicalDeviceVulkan13Features,
-		vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT
-	> feature_chain = {
-			{},                               // vk::PhysicalDeviceFeatures2
-			{.dynamicRendering = true },      // Enable dynamic rendering
-			{.extendedDynamicState = true }   // Enable extended dynamic state
+	vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT extDynamicState{
+		.extendedDynamicState = true
+	};
+	vk::PhysicalDeviceVulkan13Features vk13Features{
+		.pNext = &extDynamicState,
+		.dynamicRendering = true
+	};
+	vk::PhysicalDeviceFeatures2 features2{
+		.pNext = &vk13Features
 	};
 
 	// Enable extensions
@@ -184,7 +187,7 @@ void Device::CreateLogicalDevice() {
 
 	// Create device
 	vk::DeviceCreateInfo device_create_info{
-		.pNext = &feature_chain.get<vk::PhysicalDeviceFeatures2>(),
+		.pNext = &features2,
 		.queueCreateInfoCount = static_cast<uint32_t>(queues_info.size()),
 		.pQueueCreateInfos = queues_info.data(),
 		.enabledExtensionCount = static_cast<uint32_t>(device_extensions.size()),
