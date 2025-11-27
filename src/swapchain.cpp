@@ -77,6 +77,9 @@ Swapchain::Swapchain() {
 	m_swapchain = vk::raii::SwapchainKHR(*Device::get(), swapchain_create_info);
 	m_images = m_swapchain.getImages();
 	m_format = m_surfaceFormat.format;
+
+	CreateImageViews();
+
 	std::println("Created Swapchain");
 }
 
@@ -119,6 +122,25 @@ vk::Extent2D Swapchain::ChooseExtent(const vk::SurfaceCapabilitiesKHR& capabilit
 		std::clamp<uint32_t>(width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
 		std::clamp<uint32_t>(height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height)
 	};
+}
+
+void Swapchain::CreateImageViews() {
+	// Remove every existing view before starting
+	m_imageViews.clear();
+
+	// Create view
+	vk::ImageViewCreateInfo view_info {
+		.viewType = vk::ImageViewType::e2D,
+		.format = m_format,
+		.subresourceRange = { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 }
+	};
+
+	for (auto image : m_images) {
+		view_info.image = image;
+		m_imageViews.emplace_back(*Device::get(), view_info);
+	}
+
+	std::println("Created {} Image Views", m_imageViews.size());
 }
 
 }

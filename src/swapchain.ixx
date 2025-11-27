@@ -26,14 +26,17 @@ private:
 	static Swapchain* m_instance;
 	vk::raii::SwapchainKHR m_swapchain = nullptr;
 	std::vector<vk::Image> m_images;
-	vk::Format m_format = vk::Format::eUndefined;
+	std::vector<vk::raii::ImageView> m_imageViews;
+
 	vk::SurfaceFormatKHR m_surfaceFormat;
+	vk::Format m_format = vk::Format::eUndefined;
 	vk::PresentModeKHR m_presentMode;
 	vk::Extent2D m_extent;
 
 	vk::SurfaceFormatKHR ChooseSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& formats);
 	vk::PresentModeKHR ChoosePresentMode(const std::vector<vk::PresentModeKHR>& modes);
 	vk::Extent2D ChooseExtent(const vk::SurfaceCapabilitiesKHR& capabilities);
+	void CreateImageViews();
 };
 
 export Swapchain* swapchain() { return Swapchain::swapchain(); }
