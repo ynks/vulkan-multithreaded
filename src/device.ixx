@@ -35,6 +35,9 @@ public:
 	[[nodiscard]] /// @brief Get graphics queue
 	static vk::raii::Queue* queue() { return &device()->m_graphicsQueue; }
 
+	[[nodiscard]] /// @brief Get present queue
+	static vk::raii::Queue* presentQueue() { return &device()->m_presentQueue; }
+
 private:
 	void PickPhysicalDevice();
 	void CreateLogicalDevice();
@@ -45,6 +48,7 @@ private:
 	vk::raii::PhysicalDevice m_physicalDevice = nullptr;
 	vk::raii::Device m_device = nullptr;
 	vk::raii::Queue m_graphicsQueue = nullptr;
+	vk::raii::Queue m_presentQueue = nullptr;
 };
 
 /// @brief public wrapper to get the vulkan device

@@ -146,22 +146,72 @@ std::expected<uint32_t, DeviceError> Device::GetQueueFamily(vk::QueueFlagBits ty
 void Device::CreateLogicalDevice() {
 	std::println("Creating logical device...");
 
-	// Get queue families
-	std::vector queue_properties = m_physicalDevice.getQueueFamilyProperties();
-	uint32_t graphics_index = GetQueueFamily(vk::QueueFlagBits::eGraphics).value();
+	// Get queue family properties
+	std::vector<vk::QueueFamilyProperties> queue_properties = m_physicalDevice.getQueueFamilyProperties();
+	
+	// Find graphics queue family
+	auto graphicsQueueFamilyProperty = std::ranges::find_if(queue_properties, [](auto const& qfp) {
+		return (qfp.queueFlags & vk::QueueFlagBits::eGraphics) != static_cast<vk::QueueFlags>(0);
+	});
+	uint32_t graphics_index = static_cast<uint32_t>(std::distance(queue_properties.begin(), graphicsQueueFamilyProperty));
 	std::println("Got graphics queue at {}", graphics_index);
 
-	// Create queues
-	float graphics_queue_priority = 0.5f;
-	float compute_queue_priority = 0.2f;
+	// Find present queue family
+	auto* surface = ::window()->surface();
+	uint32_t present_index = m_physicalDevice.getSurfaceSupportKHR(graphics_index, **surface)
+		? graphics_index
+		: static_cast<uint32_t>(queue_properties.size());
 
-	std::vector<vk::DeviceQueueCreateInfo> queues_info = {
-		vk::DeviceQueueCreateInfo {
+	if (present_index == queue_properties.size()) {
+		// Graphics queue doesn't support present, look for a family that supports both
+		for (size_t i = 0; i < queue_properties.size(); i++) {
+			if ((queue_properties[i].queueFlags & vk::QueueFlagBits::eGraphics) &&
+				m_physicalDevice.getSurfaceSupportKHR(static_cast<uint32_t>(i), **surface)) {
+				graphics_index = static_cast<uint32_t>(i);
+				present_index = graphics_index;
+				break;
+			}
+		}
+		
+		if (present_index == queue_properties.size()) {
+			// Look for any family that supports present
+			for (size_t i = 0; i < queue_properties.size(); i++) {
+				if (m_physicalDevice.getSurfaceSupportKHR(static_cast<uint32_t>(i), **surface)) {
+					present_index = static_cast<uint32_t>(i);
+					break;
+				}
+			}
+		}
+	}
+
+	if ((graphics_index == queue_properties.size()) || (present_index == queue_properties.size())) {
+		throw std::runtime_error("Could not find a queue for graphics or present");
+	}
+
+	std::println("Got present queue at {}", present_index);
+
+	// Create queue infos
+	float queue_priority = 0.5f;
+	std::vector<vk::DeviceQueueCreateInfo> queues_info;
+	
+	if (graphics_index == present_index) {
+		queues_info.push_back(vk::DeviceQueueCreateInfo{
 			.queueFamilyIndex = graphics_index,
 			.queueCount = 1,
-			.pQueuePriorities = &graphics_queue_priority
-		}
-	};
+			.pQueuePriorities = &queue_priority
+		});
+	} else {
+		queues_info.push_back(vk::DeviceQueueCreateInfo{
+			.queueFamilyIndex = graphics_index,
+			.queueCount = 1,
+			.pQueuePriorities = &queue_priority
+		});
+		queues_info.push_back(vk::DeviceQueueCreateInfo{
+			.queueFamilyIndex = present_index,
+			.queueCount = 1,
+			.pQueuePriorities = &queue_priority
+		});
+	}
 
 	// Enable features
 	vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT extDynamicState{
@@ -195,8 +245,9 @@ void Device::CreateLogicalDevice() {
 	};
 	m_device = vk::raii::Device(m_physicalDevice, device_create_info);
 
-	// Retrieve queue
+	// Retrieve graphics and present queues
 	m_graphicsQueue = vk::raii::Queue(m_device, graphics_index, 0);
+	m_presentQueue = vk::raii::Queue(m_device, present_index, 0);
 
 	std::println("Created Vulkan Device");
 }

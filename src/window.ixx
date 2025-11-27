@@ -24,6 +24,9 @@ public:
 	void CreateSurface();
 	bool shouldClose() const;
 	void pollEvents();
+	
+	[[nodiscard]] /// @brief Get surface
+	static vk::raii::SurfaceKHR* surface() { return &window()->m_surface; }
 
 private:
 	static Window* m_instance;

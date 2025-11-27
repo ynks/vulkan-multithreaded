@@ -79,7 +79,7 @@ void Instance::CreateInstance() {
 			throw std::runtime_error("Required Validation Layers are not supported");
 		}
 
-		std::print("All validation layers are supported");
+		std::println("All validation layers are supported");
 
 		// Get required extensions
 		auto required_extensions = GetRequiredExtensions();
