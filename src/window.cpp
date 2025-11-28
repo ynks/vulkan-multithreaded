@@ -19,7 +19,6 @@ Window::Window() {
 	glfwInit();
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
 	m_rawWindow = glfwCreateWindow(WIDTH, HEIGHT, WINDOW_NAME, nullptr, nullptr);
 	std::println("Created window \"{}\"", WINDOW_NAME);
@@ -71,5 +70,24 @@ std::pair<uint32_t, uint32_t> Window::framebufferSize() {
 	glfwGetFramebufferSize(m_rawWindow, &width, &height);
 
 	return { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
+}
+
+void Window::waitEvents() {
+	glfwWaitEvents();
+}
+
+void Window::setUserPointer(void* pointer) {
+	glfwSetWindowUserPointer(m_rawWindow, pointer);
+}
+
+void Window::setFramebufferSizeCallback(void (*callback)(GLFWwindow*, int, int)) {
+	glfwSetFramebufferSizeCallback(m_rawWindow, callback);
+}
+
+void Window::internalResizeCallback(GLFWwindow* glfwWindow, int width, int height) {
+	auto* win = static_cast<Window*>(glfwGetWindowUserPointer(glfwWindow));
+	if (win && win->m_resizeHandler) {
+		win->m_resizeHandler(win->m_appPointer, width, height);
+	}
 }
 

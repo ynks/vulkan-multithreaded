@@ -30,8 +30,13 @@ private:
 	std::vector<vk::raii::Fence> m_drawFences;
 	uint32_t m_currentFrame = 0;
 
+	bool m_framebufferResized = false;
+
 	void initVulkan() {
 		m_window = std::make_unique<Window>();
+		m_window->setupResizeCallback(this, [](HelloTriangleApplication* app, int, int) {
+			app->m_framebufferResized = true;
+		});
 		m_instance = std::make_unique<vulkan::Instance>();
 		m_window->CreateSurface();
 		m_device = std::make_unique<vulkan::Device>();
@@ -56,10 +61,19 @@ private:
 	}
 
 	void drawFrame() {
-		m_device->get()->waitForFences(*m_drawFences[m_currentFrame], vk::True, std::numeric_limits<uint64_t>::max());
-		m_device->get()->resetFences(*m_drawFences[m_currentFrame]);
+		[[maybe_unused]] auto waitResult = m_device->get()->waitForFences(*m_drawFences[m_currentFrame], vk::True, std::numeric_limits<uint64_t>::max());
 		
 		auto [result, image_index] = m_swapchain->get()->acquireNextImage(std::numeric_limits<uint64_t>::max(), *m_presentCompleteSemaphores[m_currentFrame], nullptr);
+
+		if (result == vk::Result::eErrorOutOfDateKHR) {
+			recreateSwapChain();
+			return;
+		}
+		if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
+			throw std::runtime_error("failed to acquire swap chain image!");
+		}
+
+		m_device->get()->resetFences(*m_drawFences[m_currentFrame]);
 
 		m_commandPool->RecordCommandBuffer(m_currentFrame, image_index, m_pipeline.get());
 
@@ -87,9 +101,21 @@ private:
 			.pSwapchains = &swapchain,
 			.pImageIndices = &image_index
 		};
-		m_device->queue()->presentKHR(present_info_KHR);
+		result = m_device->queue()->presentKHR(present_info_KHR);
+		
+		if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || m_framebufferResized) {
+			m_framebufferResized = false;
+			recreateSwapChain();
+		} else if (result != vk::Result::eSuccess) {
+			throw std::runtime_error("failed to present swap chain image!");
+		}
 		
 		m_currentFrame = (m_currentFrame + 1) % m_presentCompleteSemaphores.size();
+	}
+
+	void recreateSwapChain() {
+		m_swapchain->recreate();
+		m_commandPool->CreateCommandBuffers(static_cast<uint32_t>(m_swapchain->get()->getImages().size()));
 	}
 
 	void mainLoop() {

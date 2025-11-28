@@ -12,8 +12,12 @@ namespace vulkan {
 export class Swapchain {
 public:
 	Swapchain();
+	~Swapchain() = default;
 	static Swapchain* swapchain();
 	static Swapchain* operator()();
+
+	void recreate();
+	void cleanup();
 
 	[[nodiscard]]
 	static vk::raii::SwapchainKHR* get() { return &swapchain()->m_swapchain; }
@@ -37,6 +41,7 @@ private:
 	vk::PresentModeKHR m_presentMode;
 	vk::Extent2D m_extent;
 
+	void createSwapchain();
 	vk::SurfaceFormatKHR ChooseSurfaceFormat(const std::vector<vk::SurfaceFormatKHR>& formats);
 	vk::PresentModeKHR ChoosePresentMode(const std::vector<vk::PresentModeKHR>& modes);
 	vk::Extent2D ChooseExtent(const vk::SurfaceCapabilitiesKHR& capabilities);

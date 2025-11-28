@@ -23,6 +23,10 @@ Swapchain::Swapchain() {
 	if (m_instance != nullptr) { throw std::runtime_error("One Swapchain already exists"); }
 	m_instance = this;
 
+	createSwapchain();
+}
+
+void Swapchain::createSwapchain() {
 	std::println("Creating swapchain...");
 	// Getting device capabilitites
 	auto* physical_device = device()->physicalDevice();
@@ -141,6 +145,29 @@ void Swapchain::CreateImageViews() {
 	}
 
 	std::println("Created {} Image Views", m_imageViews.size());
+}
+
+void Swapchain::cleanup() {
+	m_imageViews.clear();
+	m_swapchain.clear();
+}
+
+void Swapchain::recreate() {
+	int width = 0, height = 0;
+	auto [w, h] = window()->framebufferSize();
+	width = static_cast<int>(w);
+	height = static_cast<int>(h);
+	while (width == 0 || height == 0) {
+		auto [w2, h2] = window()->framebufferSize();
+		width = static_cast<int>(w2);
+		height = static_cast<int>(h2);
+		window()->waitEvents();
+	}
+
+	Device::get()->waitIdle();
+
+	cleanup();
+	createSwapchain();
 }
 
 }
