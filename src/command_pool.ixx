@@ -16,14 +16,18 @@ namespace vulkan {
 export class CommandPool {
 public:
 	CommandPool();
-	void CreateCommandBuffer();
-	void RecordCommandBuffer(uint32_t index, Pipeline* pipeline);
+	void CreateCommandBuffers(uint32_t count);
+	void RecordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex, Pipeline* pipeline);
+
+	vk::raii::CommandPool* get() { return &m_commandPool; };
+	vk::raii::CommandBuffer* buffer(uint32_t index) { return &m_buffers[index]; };
 
 private:
 	vk::raii::CommandPool m_commandPool = nullptr;
-	vk::raii::CommandBuffer m_buffer = nullptr;
+	std::vector<vk::raii::CommandBuffer> m_buffers;
 
 	void TransitionImageLayout (
+		vk::raii::CommandBuffer& cmdBuffer,
 		uint32_t imageIndex,
 		vk::ImageLayout oldLayout,
 		vk::ImageLayout newLayout,
@@ -42,26 +46,28 @@ CommandPool::CommandPool() {
 		.queueFamilyIndex = Device::graphicsIndex()
 	};
 	m_commandPool = { *Device::get(), pool_info };
-
 }
 
-void CommandPool::CreateCommandBuffer() {
-	std::println("Creating Command Buffer...");
+void CommandPool::CreateCommandBuffers(uint32_t count) {
+	std::println("Creating {} Command Buffers...", count);
 	vk::CommandBufferAllocateInfo buffer_info {
 		.commandPool = m_commandPool,
 		.level = vk::CommandBufferLevel::ePrimary,
-		.commandBufferCount = 1
+		.commandBufferCount = count
 	};
 
-	m_buffer = std::move(vk::raii::CommandBuffers(*Device::get(), buffer_info).front());
+	m_buffers = vk::raii::CommandBuffers(*Device::get(), buffer_info);
 }
 
-void CommandPool::RecordCommandBuffer(uint32_t index, Pipeline* pipeline) {
-	m_buffer.begin({});
+void CommandPool::RecordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex, Pipeline* pipeline) {
+	auto& cmdBuffer = m_buffers[frameIndex];
+	cmdBuffer.reset();
+	cmdBuffer.begin({});
 
 	// Set the image format and clean the buffer
 	TransitionImageLayout (
-		index,
+		cmdBuffer,
+		imageIndex,
 		vk::ImageLayout::eUndefined,
 		vk::ImageLayout::eColorAttachmentOptimal,
 		{},
@@ -72,7 +78,7 @@ void CommandPool::RecordCommandBuffer(uint32_t index, Pipeline* pipeline) {
 
 	vk::ClearValue clear_color = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f);
 	vk::RenderingAttachmentInfo attachment_info = {
-		.imageView = Swapchain::view(index),
+		.imageView = Swapchain::view(imageIndex),
 		.imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
 		.loadOp = vk::AttachmentLoadOp::eClear,
 		.storeOp= vk::AttachmentStoreOp::eStore,
@@ -86,20 +92,21 @@ void CommandPool::RecordCommandBuffer(uint32_t index, Pipeline* pipeline) {
 	};
 
 	// actual rendering
-	m_buffer.beginRendering(rendering_info);
+	cmdBuffer.beginRendering(rendering_info);
 
-	m_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline->get());
+	cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline->get());
 	auto extent = Swapchain::extent();
-	m_buffer.setViewport(0, vk::Viewport(0.0f, 0.0f, static_cast<float>(extent.width), static_cast<float>(extent.height), 0.0f, 1.0f));
-	m_buffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), extent));
+	cmdBuffer.setViewport(0, vk::Viewport(0.0f, 0.0f, static_cast<float>(extent.width), static_cast<float>(extent.height), 0.0f, 1.0f));
+	cmdBuffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), extent));
 
-	m_buffer.draw(3, 1, 0, 0);
+	cmdBuffer.draw(3, 1, 0, 0);
 
-	m_buffer.endRendering();
+	cmdBuffer.endRendering();
 
 	// transition the image format to PRESENT_SRC
 	TransitionImageLayout(
-		index,
+		cmdBuffer,
+		imageIndex,
 		vk::ImageLayout::eColorAttachmentOptimal,
 		vk::ImageLayout::ePresentSrcKHR,
 		vk::AccessFlagBits2::eColorAttachmentWrite,             // srcAccessMask
@@ -108,10 +115,11 @@ void CommandPool::RecordCommandBuffer(uint32_t index, Pipeline* pipeline) {
 		vk::PipelineStageFlagBits2::eBottomOfPipe               // dstStage
 	);
 
-	m_buffer.end();
+	cmdBuffer.end();
 }
 
 void CommandPool::TransitionImageLayout (
+	vk::raii::CommandBuffer& cmdBuffer,
 	uint32_t imageIndex,
 	vk::ImageLayout oldLayout,
 	vk::ImageLayout newLayout,
@@ -143,7 +151,7 @@ void CommandPool::TransitionImageLayout (
 		.imageMemoryBarrierCount = 1,
 		.pImageMemoryBarriers = &barrier
 	};
-	m_buffer.pipelineBarrier2(dependencyInfo);
+	cmdBuffer.pipelineBarrier2(dependencyInfo);
 }
 
 }

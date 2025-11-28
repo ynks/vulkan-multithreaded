@@ -1,6 +1,7 @@
 #include <memory>
 #include <print>
 #include <cstdlib>
+#include <vulkan/vulkan_raii.hpp>
 
 import window;
 import vulkan.instance;
@@ -24,6 +25,11 @@ private:
 	std::unique_ptr<vulkan::Pipeline> m_pipeline;
 	std::unique_ptr<vulkan::CommandPool> m_commandPool;
 
+	std::vector<vk::raii::Semaphore> m_presentCompleteSemaphores;
+	std::vector<vk::raii::Semaphore> m_renderFinishedSemaphores;
+	std::vector<vk::raii::Fence> m_drawFences;
+	uint32_t m_currentFrame = 0;
+
 	void initVulkan() {
 		m_window = std::make_unique<Window>();
 		m_instance = std::make_unique<vulkan::Instance>();
@@ -32,12 +38,67 @@ private:
 		m_swapchain = std::make_unique<vulkan::Swapchain>();
 		m_pipeline = std::make_unique<vulkan::Pipeline>();
 		m_commandPool = std::make_unique<vulkan::CommandPool>();
+		CreateSyncObjects();
+		m_commandPool->CreateCommandBuffers(static_cast<uint32_t>(m_swapchain->get()->getImages().size()));
+	}
+
+	void CreateSyncObjects() {
+		uint32_t imageCount = static_cast<uint32_t>(m_swapchain->get()->getImages().size());
+		m_presentCompleteSemaphores.reserve(imageCount);
+		m_renderFinishedSemaphores.reserve(imageCount);
+		m_drawFences.reserve(imageCount);
+		
+		for (uint32_t i = 0; i < imageCount; ++i) {
+			m_presentCompleteSemaphores.emplace_back(*m_device->get(), vk::SemaphoreCreateInfo());
+			m_renderFinishedSemaphores.emplace_back(*m_device->get(), vk::SemaphoreCreateInfo());
+			m_drawFences.emplace_back(*m_device->get(), vk::FenceCreateInfo{ .flags = vk::FenceCreateFlagBits::eSignaled });
+		}
+	}
+
+	void drawFrame() {
+		m_device->get()->waitForFences(*m_drawFences[m_currentFrame], vk::True, std::numeric_limits<uint64_t>::max());
+		m_device->get()->resetFences(*m_drawFences[m_currentFrame]);
+		
+		auto [result, image_index] = m_swapchain->get()->acquireNextImage(std::numeric_limits<uint64_t>::max(), *m_presentCompleteSemaphores[m_currentFrame], nullptr);
+
+		m_commandPool->RecordCommandBuffer(m_currentFrame, image_index, m_pipeline.get());
+
+		vk::PipelineStageFlags wait_destination_stage_mask( vk::PipelineStageFlagBits::eColorAttachmentOutput );
+		vk::Semaphore wait_semaphore = *m_presentCompleteSemaphores[m_currentFrame];
+		vk::Semaphore signal_semaphore = *m_renderFinishedSemaphores[m_currentFrame];
+		vk::CommandBuffer cmd_buffer = **m_commandPool->buffer(m_currentFrame);
+		const vk::SubmitInfo submit_info{
+			.waitSemaphoreCount = 1,
+			.pWaitSemaphores = &wait_semaphore,
+			.pWaitDstStageMask = &wait_destination_stage_mask,
+			.commandBufferCount = 1,
+			.pCommandBuffers = &cmd_buffer,
+			.signalSemaphoreCount = 1,
+			.pSignalSemaphores = &signal_semaphore
+		};
+		m_device->queue()->submit(submit_info, *m_drawFences[m_currentFrame]);
+
+		vk::Semaphore present_wait_semaphore = *m_renderFinishedSemaphores[m_currentFrame];
+		vk::SwapchainKHR swapchain = **m_swapchain->get();
+		const vk::PresentInfoKHR present_info_KHR{
+			.waitSemaphoreCount = 1,
+			.pWaitSemaphores = &present_wait_semaphore,
+			.swapchainCount = 1,
+			.pSwapchains = &swapchain,
+			.pImageIndices = &image_index
+		};
+		m_device->queue()->presentKHR(present_info_KHR);
+		
+		m_currentFrame = (m_currentFrame + 1) % m_presentCompleteSemaphores.size();
 	}
 
 	void mainLoop() {
 		while (!m_window->shouldClose()) {
 			m_window->pollEvents();
+			drawFrame();
 		}
+
+		m_device->get()->waitIdle();
 	}
 };
 

@@ -223,6 +223,7 @@ void Device::CreateLogicalDevice() {
 	};
 	vk::PhysicalDeviceVulkan13Features vk13Features{
 		.pNext = &vk11Features,
+		.synchronization2 = true,
 		.dynamicRendering = true
 	};
 	vk::PhysicalDeviceFeatures2 features2{
