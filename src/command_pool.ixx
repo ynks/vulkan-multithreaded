@@ -1,6 +1,7 @@
 /// @file command_pool.ixx
 /// @author Xein
 /// @date 28-Nov-2025
+
 module;
 
 #include <vulkan/vulkan_raii.hpp>
@@ -18,12 +19,21 @@ public:
 	void CreateCommandBuffers(uint32_t count);
 	void RecordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex, Pipeline* pipeline);
 
+	static CommandPool* commandpool() {
+		if (!m_instance) {
+			throw std::runtime_error("Trying to access CommandPool but it doesn't exist yet");
+		}
+		return m_instance;
+	}
+	static CommandPool* operator()() { return commandpool(); }
+
 	[[nodiscard]]
 	vk::raii::CommandPool* get() { return &m_commandPool; }
 	[[nodiscard]]
 	vk::raii::CommandBuffer* buffer(uint32_t index) { return &m_buffers[index]; }
 
 private:
+	static CommandPool* m_instance;
 	vk::raii::CommandPool m_commandPool = nullptr;
 	std::vector<vk::raii::CommandBuffer> m_buffers;
 

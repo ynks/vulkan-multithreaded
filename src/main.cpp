@@ -9,6 +9,7 @@ import vulkan.device;
 import vulkan.swapchain;
 import vulkan.pipeline;
 import vulkan.commandpool;
+import vulkan.buffers;
 
 class HelloTriangleApplication {
 public:
@@ -24,6 +25,7 @@ private:
 	std::unique_ptr<vulkan::Swapchain> m_swapchain;
 	std::unique_ptr<vulkan::Pipeline> m_pipeline;
 	std::unique_ptr<vulkan::CommandPool> m_commandPool;
+	std::unique_ptr<vulkan::VertexBuffer> m_vertexBuffer;
 
 	std::vector<vk::raii::Semaphore> m_presentCompleteSemaphores;
 	std::vector<vk::raii::Semaphore> m_renderFinishedSemaphores;
@@ -44,6 +46,7 @@ private:
 		m_pipeline = std::make_unique<vulkan::Pipeline>();
 		m_commandPool = std::make_unique<vulkan::CommandPool>();
 		CreateSyncObjects();
+		CreateVertexBuffer();
 		m_commandPool->CreateCommandBuffers(static_cast<uint32_t>(m_swapchain->get()->getImages().size()));
 	}
 
@@ -58,6 +61,19 @@ private:
 			m_renderFinishedSemaphores.emplace_back(*m_device->get(), vk::SemaphoreCreateInfo());
 			m_drawFences.emplace_back(*m_device->get(), vk::FenceCreateInfo{ .flags = vk::FenceCreateFlagBits::eSignaled });
 		}
+	}
+
+
+
+	void CreateVertexBuffer() {
+
+		const std::vector<vulkan::Vertex> vertices = {
+			{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+			{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+			{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+		};
+
+		m_vertexBuffer = std::make_unique<vulkan::VertexBuffer>(vertices);
 	}
 
 	void drawFrame() {

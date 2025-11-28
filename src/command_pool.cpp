@@ -10,11 +10,19 @@ module vulkan.commandpool;
 import vulkan.device;
 import vulkan.swapchain;
 import vulkan.pipeline;
+import vulkan.buffers;
 
 namespace vulkan {
 
+CommandPool* CommandPool::m_instance = nullptr;
+
 CommandPool::CommandPool() {
 	std::println("Creating Command Pool...");
+
+	if (m_instance)
+		throw std::runtime_error("Command Pool already exists");
+	m_instance = this;
+		
 
 	vk::CommandPoolCreateInfo pool_info = {
 		.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
@@ -73,6 +81,9 @@ void CommandPool::RecordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex, 
 	auto extent = Swapchain::extent();
 	cmdBuffer.setViewport(0, vk::Viewport(0.0f, 0.0f, static_cast<float>(extent.width), static_cast<float>(extent.height), 0.0f, 1.0f));
 	cmdBuffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), extent));
+
+	//TODO: somehow obtain vertex buffer from outside, it cant be a singelton tho
+	cmdBuffer.bindVertexBuffers(0, **vulkan::VertexBuffer::getBuffer(), {0});
 
 	cmdBuffer.draw(3, 1, 0, 0);
 

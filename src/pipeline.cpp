@@ -10,6 +10,7 @@ module;
 module vulkan.pipeline;
 import vulkan.device;
 import vulkan.swapchain;
+import vulkan.buffers;
 
 namespace vulkan {
 
@@ -127,7 +128,15 @@ void Pipeline::CreateGraphicsPipeline(const ShaderStages& shader_stages, const D
 		.scissorCount = 1
 	};
 
-	vk::PipelineVertexInputStateCreateInfo vertex_info;
+	auto bindingDescription = vulkan::Vertex::getBindingDescription();
+	auto attributeDescriptions = vulkan::Vertex::getAttributeDescriptions();
+	vk::PipelineVertexInputStateCreateInfo vertex_info {
+		.vertexBindingDescriptionCount = 1,
+		.pVertexBindingDescriptions = &bindingDescription,
+		.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size()),
+		.pVertexAttributeDescriptions = attributeDescriptions.data()
+	};
+	
 	vk::PipelineInputAssemblyStateCreateInfo assembly_info {
 		.topology = vk::PrimitiveTopology::eTriangleList
 	};
