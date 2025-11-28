@@ -16,6 +16,8 @@ namespace vulkan {
 export class Pipeline {
 public:
 	Pipeline();
+	[[nodiscard]]
+	vk::raii::Pipeline& get() { return m_pipeline; }
 
 private:
 	struct ShaderStages {

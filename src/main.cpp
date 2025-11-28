@@ -7,6 +7,7 @@ import vulkan.instance;
 import vulkan.device;
 import vulkan.swapchain;
 import vulkan.pipeline;
+import vulkan.commandpool;
 
 class HelloTriangleApplication {
 public:
@@ -21,6 +22,7 @@ private:
 	std::unique_ptr<vulkan::Device> m_device;
 	std::unique_ptr<vulkan::Swapchain> m_swapchain;
 	std::unique_ptr<vulkan::Pipeline> m_pipeline;
+	std::unique_ptr<vulkan::CommandPool> m_commandPool;
 
 	void initVulkan() {
 		m_window = std::make_unique<Window>();
@@ -29,6 +31,7 @@ private:
 		m_device = std::make_unique<vulkan::Device>();
 		m_swapchain = std::make_unique<vulkan::Swapchain>();
 		m_pipeline = std::make_unique<vulkan::Pipeline>();
+		m_commandPool = std::make_unique<vulkan::CommandPool>();
 	}
 
 	void mainLoop() {
