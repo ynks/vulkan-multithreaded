@@ -101,6 +101,7 @@ vk::PipelineColorBlendStateCreateInfo Pipeline::CreateColorBlendState(vk::Pipeli
 	attachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
 	attachment.dstAlphaBlendFactor = vk::BlendFactor::eZero;
 	attachment.alphaBlendOp = vk::BlendOp::eAdd;
+	attachment.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
 
 	return vk::PipelineColorBlendStateCreateInfo {
 		.logicOpEnable = vk::False,
