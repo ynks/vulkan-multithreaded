@@ -14,7 +14,7 @@ execute("mkdir -p build")
 
 -- Configure with CMake using Ninja generator for C++ modules support
 print("=== Generating files ===")
-execute("cd build && CC=clang CXX=clang++ cmake -G Ninja -DENABLE_CPP20_MODULE=OFF ..")
+execute("cd build && CC=clang CXX=clang++ cmake -G Ninja ..")
 
 -- Build the project
 print("=== Compiling project ===")
