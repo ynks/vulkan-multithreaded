@@ -29,14 +29,14 @@ Swapchain::Swapchain() {
 void Swapchain::createSwapchain() {
 	std::println("Creating swapchain...");
 	// Getting device capabilitites
-	auto* physical_device = device()->physicalDevice();
+	auto& physical_device = device()->physicalDevice();
 	auto* surface = window()->surface();
 
-	auto surface_capabilities = physical_device->getSurfaceCapabilitiesKHR(*surface);
+	auto surface_capabilities = physical_device.getSurfaceCapabilitiesKHR(*surface);
 
-	std::vector available_formats = physical_device->getSurfaceFormatsKHR(*surface);
+	std::vector available_formats = physical_device.getSurfaceFormatsKHR(*surface);
 	std::println("Obtained {} available formats", available_formats.size());
-	std::vector available_present_modes = physical_device->getSurfacePresentModesKHR(*surface);
+	std::vector available_present_modes = physical_device.getSurfacePresentModesKHR(*surface);
 	std::println("Obtained {} available present modes", available_present_modes.size());
 
 	// Creating the Swapchain
@@ -78,7 +78,7 @@ void Swapchain::createSwapchain() {
 		swapchain_create_info.pQueueFamilyIndices = queue_family_indices.data();
 	}
 
-	m_swapchain = vk::raii::SwapchainKHR(*Device::get(), swapchain_create_info);
+	m_swapchain = vk::raii::SwapchainKHR(Device::get(), swapchain_create_info);
 	m_images = m_swapchain.getImages();
 	m_format = m_surfaceFormat.format;
 
@@ -141,7 +141,7 @@ void Swapchain::CreateImageViews() {
 
 	for (auto image : m_images) {
 		view_info.image = image;
-		m_imageViews.emplace_back(*Device::get(), view_info);
+		m_imageViews.emplace_back(Device::get(), view_info);
 	}
 
 	std::println("Created {} Image Views", m_imageViews.size());
@@ -164,7 +164,7 @@ void Swapchain::recreate() {
 		window()->waitEvents();
 	}
 
-	Device::get()->waitIdle();
+	Device::get().waitIdle();
 
 	cleanup();
 	createSwapchain();

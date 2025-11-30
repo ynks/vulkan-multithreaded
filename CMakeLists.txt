@@ -131,3 +131,4 @@ endif ()
 
 
 target_compile_definitions(vulkan_app PRIVATE VULKAN_HPP_NO_STRUCT_CONSTRUCTORS=1)
+target_compile_options(vulkan_app PRIVATE -fpermissive)

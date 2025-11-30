@@ -20,7 +20,7 @@ public:
 	void cleanup();
 
 	[[nodiscard]]
-	static vk::raii::SwapchainKHR* get() { return &swapchain()->m_swapchain; }
+	static vk::raii::SwapchainKHR& get() { return swapchain()->m_swapchain; }
 	[[nodiscard]]
 	static vk::Image& image(std::size_t index) { return swapchain()->m_images[index]; }
 	[[nodiscard]]

@@ -10,7 +10,7 @@ module;
 module vulkan.pipeline;
 import vulkan.device;
 import vulkan.swapchain;
-import vulkan.buffers;
+import vulkan.mesh;
 
 namespace vulkan {
 
@@ -49,7 +49,7 @@ vk::raii::ShaderModule Pipeline::CreateShaderModule(const std::vector<char>& cod
 		.pCode = reinterpret_cast<const uint32_t*>(code.data())
 	};
 
-	vk::raii::ShaderModule shader_module{*Device::get(), shader_info};
+	vk::raii::ShaderModule shader_module{Device::get(), shader_info};
 	std::println("Created shader module");
 	return shader_module;
 }
@@ -117,7 +117,7 @@ void Pipeline::CreatePipelineLayout() {
 		.setLayoutCount = 0,
 		.pushConstantRangeCount = 0
 	};
-	m_pipelineLayout = vk::raii::PipelineLayout(*Device::get(), pipeline_layout_info);
+	m_pipelineLayout = vk::raii::PipelineLayout(Device::get(), pipeline_layout_info);
 	std::println("Created Pipeline Layout");
 }
 
@@ -128,8 +128,8 @@ void Pipeline::CreateGraphicsPipeline(const ShaderStages& shader_stages, const D
 		.scissorCount = 1
 	};
 
-	auto bindingDescription = vulkan::Vertex::getBindingDescription();
-	auto attributeDescriptions = vulkan::Vertex::getAttributeDescriptions();
+	auto bindingDescription = vulkan::Vertex::GetBindingDescription();
+	auto attributeDescriptions = vulkan::Vertex::GetAttributeDescriptions();
 	vk::PipelineVertexInputStateCreateInfo vertex_info {
 		.vertexBindingDescriptionCount = 1,
 		.pVertexBindingDescriptions = &bindingDescription,
@@ -178,7 +178,7 @@ void Pipeline::CreateGraphicsPipeline(const ShaderStages& shader_stages, const D
 		.renderPass = nullptr
 	};
 
-	m_pipeline = vk::raii::Pipeline(*Device::get(), nullptr, pipeline_info);
+	m_pipeline = vk::raii::Pipeline(Device::get(), nullptr, pipeline_info);
 }
 
 }

@@ -5,48 +5,40 @@
 module;
 
 #include <vulkan/vulkan_raii.hpp>
+#include <memory>
+#include <vector>
 
 export module vulkan.commandpool;
 import vulkan.device;
-import vulkan.swapchain;
-import vulkan.pipeline;
+import vulkan.commandbuffer;
 
 namespace vulkan {
 
 export class CommandPool {
 public:
 	CommandPool();
-	void CreateCommandBuffers(uint32_t count);
-	void RecordCommandBuffer(uint32_t frameIndex, uint32_t imageIndex, Pipeline* pipeline);
 
-	static CommandPool* commandpool() {
-		if (!m_instance) {
-			throw std::runtime_error("Trying to access CommandPool but it doesn't exist yet");
-		}
-		return m_instance;
+	static CommandPool& GetForCurrentThread();
+
+	/// @brief Allocate a single command buffer
+	[[nodiscard]]
+	CommandBuffer AllocateBuffer(vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary);
+
+	/// @brief Allocate multiple command buffers
+	[[nodiscard]]
+	std::vector<CommandBuffer> AllocateBuffers(uint32_t count, vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary);
+
+	/// @brief Get the underlying pool
+	[[nodiscard]]
+	vk::raii::CommandPool& get() { return m_commandPool; }
+
+	/// @brief Reset the entire pool
+	void Reset(vk::CommandPoolResetFlags flags = {}) {
+		m_commandPool.reset(flags);
 	}
-	static CommandPool* operator()() { return commandpool(); }
-
-	[[nodiscard]]
-	vk::raii::CommandPool* get() { return &m_commandPool; }
-	[[nodiscard]]
-	vk::raii::CommandBuffer* buffer(uint32_t index) { return &m_buffers[index]; }
 
 private:
-	static CommandPool* m_instance;
 	vk::raii::CommandPool m_commandPool = nullptr;
-	std::vector<vk::raii::CommandBuffer> m_buffers;
-
-	void TransitionImageLayout(
-		vk::raii::CommandBuffer& cmdBuffer,
-		uint32_t imageIndex,
-		vk::ImageLayout oldLayout,
-		vk::ImageLayout newLayout,
-		vk::AccessFlags2 srcAccessMask,
-		vk::AccessFlags2 dstAccessMask,
-		vk::PipelineStageFlags2 srcStageMask,
-		vk::PipelineStageFlags2 dstStageMask
-	);
 };
 
 }

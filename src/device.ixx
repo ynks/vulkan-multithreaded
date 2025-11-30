@@ -27,16 +27,16 @@ public:
 	static Device* device();
 
 	[[nodiscard]] /// @brief Exposes vk::raii::Device
-	static vk::raii::Device* get() { return &device()->m_device; }
+	static vk::raii::Device& get() { return device()->m_device; }
 
 	[[nodiscard]] /// @brief Get physical device
-	static vk::raii::PhysicalDevice* physicalDevice() { return &device()->m_physicalDevice; }
+	static vk::raii::PhysicalDevice& physicalDevice() { return device()->m_physicalDevice; }
 
 	[[nodiscard]] /// @brief Get graphics queue
-	static vk::raii::Queue* queue() { return &device()->m_graphicsQueue; }
+	static vk::raii::Queue& queue() { return device()->m_graphicsQueue; }
 
 	[[nodiscard]] /// @brief Get present queue
-	static vk::raii::Queue* presentQueue() { return &device()->m_presentQueue; }
+	static vk::raii::Queue& presentQueue() { return device()->m_presentQueue; }
 
 	[[nodiscard]]
 	static uint32_t graphicsIndex() { return device()->m_graphicsFamilyIndex; }
@@ -62,7 +62,7 @@ private:
 export Device* device() { return Device::device(); }
 
 /// @brief public wrapper to get the vulkan queue
-export vk::raii::Queue* queue() { return vulkan::Device::queue(); }
+export vk::raii::Queue& queue() { return vulkan::Device::queue(); }
 
 Device* Device::m_thisDevice = nullptr;
 
