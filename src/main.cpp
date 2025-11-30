@@ -3,6 +3,11 @@
 #include <cstdlib>
 #include <vulkan/vulkan_raii.hpp>
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include "glm/glm.hpp"
+#include "glm/gtx/transform.hpp"
+#include "glm/gtc/matrix_transform.hpp"
+
 import window;
 import vulkan.instance;
 import vulkan.device;
@@ -11,6 +16,8 @@ import vulkan.pipeline;
 import vulkan.commandpool;
 import vulkan.commandbuffer;
 import vulkan.mesh;
+
+float rotation = 0.0f;
 
 class HelloTriangleApplication {
 public:
@@ -25,7 +32,8 @@ private:
 	std::unique_ptr<vulkan::Device> m_device;
 	std::unique_ptr<vulkan::Swapchain> m_swapchain;
 	std::unique_ptr<vulkan::Pipeline> m_pipeline;
-	std::unique_ptr<vulkan::Mesh> m_mesh;
+	// std::unique_ptr<vulkan::Mesh> m_mesh;
+	std::vector<std::unique_ptr<vulkan::Mesh>> m_meshes;
 
 	std::vector<vulkan::CommandBuffer> m_commandBuffers;
 	std::vector<vk::raii::Semaphore> m_presentCompleteSemaphores;
@@ -44,9 +52,13 @@ private:
 		m_window->CreateSurface();
 		m_device = std::make_unique<vulkan::Device>();
 		m_swapchain = std::make_unique<vulkan::Swapchain>();
-		m_pipeline = std::make_unique<vulkan::Pipeline>();
-		CreateSyncObjects();
+		m_pipeline = std::make_unique<vulkan::Pipeline>(); // pipeline now owns descriptor set layout
 		CreateMesh();
+		// init mesh descriptors using pipeline's descriptor set layout and frame count
+		for (auto& mesh : m_meshes) {
+			mesh->InitDescriptors(m_pipeline->GetDescriptorSetLayout(), static_cast<uint32_t>(m_swapchain->get().getImages().size()));
+		}
+		CreateSyncObjects();
 		CreateCommandBuffers();
 	}
 
@@ -64,7 +76,10 @@ private:
 	}
 
 	void CreateMesh() {
-		m_mesh = std::make_unique<vulkan::Mesh>(vulkan::Mesh::CreateTriangle());
+		m_meshes.clear();
+		// Create a couple of meshes: a cube and a quad
+		m_meshes.emplace_back(std::make_unique<vulkan::Mesh>(vulkan::Mesh::CreateCube()));
+		m_meshes.emplace_back(std::make_unique<vulkan::Mesh>(vulkan::Mesh::CreateCube()));
 	}
 
 	void CreateCommandBuffers() {
@@ -119,16 +134,41 @@ private:
 				.pColorAttachments = &colorAttachment
 			};
 
+			// Update uniform buffer with proper matrices
+			rotation += 1.f * 0.166f;
+			float angle = glm::radians(rotation);
+			
+			for (size_t i = 0; i < m_meshes.size(); ++i) {
+				vulkan::UniformBufferObject ubo{};
+
+				ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(static_cast<float>(i) * 2.0f - 1.f, 0.0f, 0.0f))
+					* glm::rotate(glm::mat4(1.0f), angle, glm::vec3(1.0f, 0.0f, 1.0f));
+				// Shared view
+				ubo.view = glm::lookAt(
+					glm::vec3(0.0f, 4.0f, 0.0f),
+					glm::vec3(0.0f, 0.0f, 0.0f),
+					glm::vec3(0.0f, 0.0f, 1.0f)
+				);
+				// Shared projection
+				auto extent = vulkan::Swapchain::extent();
+				float aspectRatio = extent.width / (float)extent.height;
+				ubo.proj = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 10.0f);
+				ubo.proj[1][1] *= -1;
+				m_meshes[i]->UpdateUniformBuffer(m_currentFrame, ubo);
+			}
+
 			cmd.beginRendering(renderingInfo);
 
 			// Bind pipeline and set dynamic state
 			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, m_pipeline->get());
-			auto extent = vulkan::Swapchain::extent();
-			cmd.setViewport(0, vk::Viewport(0.0f, 0.0f, static_cast<float>(extent.width), static_cast<float>(extent.height), 0.0f, 1.0f));
-			cmd.setScissor(0, vk::Rect2D({0, 0}, extent));
+			auto extent2 = vulkan::Swapchain::extent();
+			cmd.setViewport(0, vk::Viewport(0.0f, 0.0f, static_cast<float>(extent2.width), static_cast<float>(extent2.height), 0.0f, 1.0f));
+			cmd.setScissor(0, vk::Rect2D({0, 0}, extent2));
 
-			// Draw mesh
-			m_mesh->BindAndDraw(cmd);
+			// Draw all meshes
+			for (auto& mesh : m_meshes) {
+				mesh->BindAndDraw(cmd, m_pipeline->GetPipelineLayout(), m_currentFrame);
+			}
 
 			cmd.endRendering();
 

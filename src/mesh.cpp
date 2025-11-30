@@ -10,6 +10,8 @@ module;
 
 module vulkan.mesh;
 import vulkan.buffers;
+import vulkan.device;
+import vulkan.swapchain;
 
 namespace vulkan {
 
@@ -17,6 +19,9 @@ Mesh::Mesh(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& ind
 	: m_vertexCount(static_cast<uint32_t>(vertices.size()))
 	, m_indexCount(static_cast<uint32_t>(indices.size()))
 {
+	// Get the number of frames from swapchain images
+	uint32_t frameCount = static_cast<uint32_t>(Swapchain::get().getImages().size());
+
 	// Create vertex buffer
 	vk::DeviceSize vertexBufferSize = sizeof(Vertex) * vertices.size();
 	m_vertexBuffer = std::make_unique<Buffer>(
@@ -59,9 +64,19 @@ Mesh::Mesh(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& ind
 
 		indexStagingBuffer.copyBuffer(m_indexBuffer->getBuffer(), indexBufferSize);
 	}
+
+	// Descriptors are initialized later via InitDescriptors with pipeline set layout
 }
 
-void Mesh::Bind(vk::raii::CommandBuffer& cmdBuffer) const {
+void Mesh::InitDescriptors(const vk::raii::DescriptorSetLayout& setLayout, uint32_t frameCount) {
+	// copy layout handle
+	m_descriptorSetLayout = vk::raii::DescriptorSetLayout(Device::get(), *setLayout);
+	CreateUniformBuffers(frameCount);
+	CreateDescriptorPool(frameCount);
+	CreateDescriptorSets();
+}
+
+void Mesh::Bind(vk::raii::CommandBuffer& cmdBuffer, const vk::raii::PipelineLayout& pipelineLayout, uint32_t frameIndex) const {
 	vk::Buffer vertexBuffer = *m_vertexBuffer->getBuffer();
 	vk::DeviceSize offset = 0;
 	cmdBuffer.bindVertexBuffers(0, vertexBuffer, offset);
@@ -69,6 +84,15 @@ void Mesh::Bind(vk::raii::CommandBuffer& cmdBuffer) const {
 	if (m_indexBuffer) {
 		cmdBuffer.bindIndexBuffer(*m_indexBuffer->getBuffer(), 0, vk::IndexType::eUint32);
 	}
+
+	// Bind descriptor set for this frame
+	cmdBuffer.bindDescriptorSets(
+		vk::PipelineBindPoint::eGraphics,
+		*pipelineLayout,
+		0,
+		*m_descriptorSets[frameIndex],
+		nullptr
+	);
 }
 
 void Mesh::Draw(vk::raii::CommandBuffer& cmdBuffer, uint32_t instanceCount) const {
@@ -143,6 +167,79 @@ Mesh Mesh::CreateCube() {
 	};
 
 	return Mesh(vertices, indices);
+}
+
+void Mesh::CreateUniformBuffers(uint32_t frameCount) {
+	vk::DeviceSize bufferSize = sizeof(UniformBufferObject);
+
+	m_uniformBuffers.resize(frameCount);
+	m_uniformBuffersMapped.resize(frameCount);
+
+	for (uint32_t i = 0; i < frameCount; ++i) {
+		m_uniformBuffers[i] = std::make_unique<Buffer>(
+			bufferSize,
+			vk::BufferUsageFlagBits::eUniformBuffer,
+			vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
+		);
+
+		// Map the buffer memory persistently
+		m_uniformBuffersMapped[i] = m_uniformBuffers[i]->getMemory().mapMemory(0, bufferSize);
+	}
+}
+
+void Mesh::CreateDescriptorPool(uint32_t frameCount) {
+	vk::DescriptorPoolSize poolSize{
+		.type = vk::DescriptorType::eUniformBuffer,
+		.descriptorCount = frameCount
+	};
+
+	vk::DescriptorPoolCreateInfo poolInfo{
+		.flags = {},
+		.maxSets = frameCount,
+		.poolSizeCount = 1,
+		.pPoolSizes = &poolSize
+	};
+
+	m_descriptorPool = vk::raii::DescriptorPool(Device::get(), poolInfo);
+}
+
+void Mesh::CreateDescriptorSets() {
+	uint32_t frameCount = static_cast<uint32_t>(m_uniformBuffers.size());
+	std::vector<vk::DescriptorSetLayout> layouts(frameCount, *m_descriptorSetLayout);
+
+	vk::DescriptorSetAllocateInfo allocInfo{
+		.descriptorPool = *m_descriptorPool,
+		.descriptorSetCount = frameCount,
+		.pSetLayouts = layouts.data()
+	};
+
+	m_descriptorSets = vk::raii::DescriptorSets(Device::get(), allocInfo);
+
+	// Update descriptor sets to point to uniform buffers
+	for (uint32_t i = 0; i < frameCount; ++i) {
+		vk::DescriptorBufferInfo bufferInfo{
+			.buffer = *m_uniformBuffers[i]->getBuffer(),
+			.offset = 0,
+			.range = sizeof(UniformBufferObject)
+		};
+
+		vk::WriteDescriptorSet descriptorWrite{
+			.dstSet = *m_descriptorSets[i],
+			.dstBinding = 0,
+			.dstArrayElement = 0,
+			.descriptorCount = 1,
+			.descriptorType = vk::DescriptorType::eUniformBuffer,
+			.pImageInfo = nullptr,
+			.pBufferInfo = &bufferInfo,
+			.pTexelBufferView = nullptr
+		};
+
+		Device::get().updateDescriptorSets(descriptorWrite, nullptr);
+	}
+}
+
+void Mesh::UpdateUniformBuffer(uint32_t frameIndex, const UniformBufferObject& ubo) {
+	memcpy(m_uniformBuffersMapped[frameIndex], &ubo, sizeof(UniformBufferObject));
 }
 
 }

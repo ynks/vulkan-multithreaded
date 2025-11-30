@@ -31,6 +31,7 @@ std::vector<char> ReadFile(const std::string& path) {
 Pipeline::Pipeline() {
 	std::println("Creating pipeline...");
 
+	CreateDescriptorSetLayout();
 	auto shader_stages = CreateShaderStages();
 	auto dynamic_states = CreateDynamicStates();
 
@@ -39,6 +40,22 @@ Pipeline::Pipeline() {
 
 	CreatePipelineLayout();
 	CreateGraphicsPipeline(shader_stages, dynamic_states, color_blending);
+
+	std::println("Created Pipeline");
+}
+
+Pipeline::Pipeline(const vk::raii::PipelineLayout& pipelineLayout) {
+	std::println("Creating pipeline with external layout...");
+
+	auto shader_stages = CreateShaderStages();
+	auto dynamic_states = CreateDynamicStates();
+
+	vk::PipelineColorBlendAttachmentState color_blend_attachment;
+	auto color_blending = CreateColorBlendState(color_blend_attachment);
+
+	// Use the provided pipeline layout
+	m_pipelineLayout = nullptr; // external
+	CreateGraphicsPipeline(shader_stages, dynamic_states, color_blending, &pipelineLayout);
 
 	std::println("Created Pipeline");
 }
@@ -112,9 +129,28 @@ vk::PipelineColorBlendStateCreateInfo Pipeline::CreateColorBlendState(vk::Pipeli
 	};
 }
 
+void Pipeline::CreateDescriptorSetLayout() {
+	vk::DescriptorSetLayoutBinding uboLayoutBinding{
+		.binding = 0,
+		.descriptorType = vk::DescriptorType::eUniformBuffer,
+		.descriptorCount = 1,
+		.stageFlags = vk::ShaderStageFlagBits::eVertex,
+		.pImmutableSamplers = nullptr
+	};
+
+	vk::DescriptorSetLayoutCreateInfo layoutInfo{
+		.flags = {},
+		.bindingCount = 1,
+		.pBindings = &uboLayoutBinding
+	};
+
+	m_descriptorSetLayout = vk::raii::DescriptorSetLayout(Device::get(), layoutInfo);
+}
+
 void Pipeline::CreatePipelineLayout() {
 	vk::PipelineLayoutCreateInfo pipeline_layout_info {
-		.setLayoutCount = 0,
+		.setLayoutCount = 1,
+		.pSetLayouts = &*m_descriptorSetLayout,
 		.pushConstantRangeCount = 0
 	};
 	m_pipelineLayout = vk::raii::PipelineLayout(Device::get(), pipeline_layout_info);
@@ -122,7 +158,8 @@ void Pipeline::CreatePipelineLayout() {
 }
 
 void Pipeline::CreateGraphicsPipeline(const ShaderStages& shader_stages, const DynamicStates& dynamic_states,
-                                      const vk::PipelineColorBlendStateCreateInfo& color_blending) {
+                                      const vk::PipelineColorBlendStateCreateInfo& color_blending,
+                                      const vk::raii::PipelineLayout* externalLayout) {
 	vk::PipelineViewportStateCreateInfo viewport_info {
 		.viewportCount = 1,
 		.scissorCount = 1
@@ -163,6 +200,9 @@ void Pipeline::CreateGraphicsPipeline(const ShaderStages& shader_stages, const D
 		.pColorAttachmentFormats = &sw_format
 	};
 
+	// Use external layout if provided, otherwise use own
+	vk::PipelineLayout layout = externalLayout ? **externalLayout : *m_pipelineLayout;
+
 	vk::GraphicsPipelineCreateInfo pipeline_info {
 		.pNext = &pipeline_rendering_info,
 		.stageCount = 2,
@@ -174,7 +214,7 @@ void Pipeline::CreateGraphicsPipeline(const ShaderStages& shader_stages, const D
 		.pMultisampleState = &multisampling,
 		.pColorBlendState = &color_blending,
 		.pDynamicState = &dynamic_states.info,
-		.layout = m_pipelineLayout,
+		.layout = layout,
 		.renderPass = nullptr
 	};
 

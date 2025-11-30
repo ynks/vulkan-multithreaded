@@ -16,8 +16,14 @@ namespace vulkan {
 export class Pipeline {
 public:
 	Pipeline();
+	Pipeline(const vk::raii::PipelineLayout& pipelineLayout);
+	
 	[[nodiscard]]
 	vk::raii::Pipeline& get() { return m_pipeline; }
+	[[nodiscard]]
+	const vk::raii::PipelineLayout& GetPipelineLayout() const { return m_pipelineLayout; }
+	[[nodiscard]]
+	const vk::raii::DescriptorSetLayout& GetDescriptorSetLayout() const { return m_descriptorSetLayout; }
 
 private:
 	struct ShaderStages {
@@ -42,11 +48,14 @@ private:
 	[[nodiscard]]
 	vk::PipelineColorBlendStateCreateInfo CreateColorBlendState(vk::PipelineColorBlendAttachmentState& attachment);
 
+	void CreateDescriptorSetLayout();
 	void CreatePipelineLayout();
 
 	void CreateGraphicsPipeline(const ShaderStages& shader_stages, const DynamicStates& dynamic_states,
-	                           const vk::PipelineColorBlendStateCreateInfo& color_blending);
+	                           const vk::PipelineColorBlendStateCreateInfo& color_blending,
+	                           const vk::raii::PipelineLayout* externalLayout = nullptr);
 
+	vk::raii::DescriptorSetLayout m_descriptorSetLayout = nullptr;
 	vk::raii::PipelineLayout m_pipelineLayout = nullptr;
 	vk::raii::Pipeline m_pipeline = nullptr;
 };
