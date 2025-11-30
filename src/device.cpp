@@ -93,7 +93,7 @@ std::expected<unsigned, DeviceError> Device::GetDeviceScore(const vk::raii::Phys
 	score += properties.limits.maxViewports;
 	score += properties.limits.maxColorAttachments;
 
-	std::println("Device \"{0}\" scored {1}", properties.deviceName, score);
+	std::println("Device \"{0}\" scored {1}", static_cast<std::string>(properties.deviceName.data()), score);
 
 	return score;
 }
@@ -106,7 +106,7 @@ void Device::PickPhysicalDevice() {
 	auto devices = vk_instance->enumeratePhysicalDevices();
 	if (devices.empty()) throw std::runtime_error("No physical device found");
 	std::println("Found {} devices:", devices.size());
-	for (const auto& d : devices) std::println("\t{}", d.getProperties().deviceName);
+	for (const auto& d : devices) std::println("\t{}", static_cast<std::string>(d.getProperties().deviceName.data()));
 
 	// Assign score
 	auto bestDevice = std::max_element(devices.begin(), devices.end(),
@@ -126,7 +126,7 @@ void Device::PickPhysicalDevice() {
 	}
 
 	m_physicalDevice = *bestDevice;
-	std::println("Physical device \"{0}\" chosen", m_physicalDevice.getProperties().deviceName);
+	std::println("Physical device \"{0}\" chosen", static_cast<std::string>(m_physicalDevice.getProperties().deviceName.data()));
 }
 
 std::expected<uint32_t, DeviceError> Device::GetQueueFamily(vk::QueueFlagBits type) {
