@@ -4,6 +4,7 @@
 #include <atomic>
 #include <thread>
 #include <vulkan/vulkan_raii.hpp>
+#include <mutex>
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include "glm/glm.hpp"
@@ -48,6 +49,11 @@ private:
 	toast::ThreadPool m_threadPool;
 	bool m_framebufferResized = false;
 
+	// Grid layout for meshes
+	int m_gridWidth = 5;
+	int m_gridHeight = 5;
+	float m_gridSpacing = 2.0f;
+
 	void initVulkan() {
 		m_window = std::make_unique<Window>();
 		m_window->setupResizeCallback(this, [](HelloTriangleApplication* app, int, int) {
@@ -84,9 +90,12 @@ private:
 
 	void CreateMesh() {
 		m_meshes.clear();
-		// Create a couple of meshes: a cube and a quad
-		while (m_meshes.size() <= 13) {
-			m_meshes.emplace_back(std::make_unique<vulkan::Mesh>(vulkan::Mesh::CreateCube()));
+		int total = m_gridWidth * m_gridHeight;
+		m_meshes.reserve(total);
+		for (int y = 0; y < m_gridHeight; ++y) {
+			for (int x = 0; x < m_gridWidth; ++x) {
+				m_meshes.emplace_back(std::make_unique<vulkan::Mesh>(vulkan::Mesh::CreateCube()));
+			}
 		}
 	}
 
@@ -118,10 +127,18 @@ private:
 		rotation += 1.f * 0.166f;
 		float angle = glm::radians(rotation);
 		
+		// Compute centered grid origin
+		float startX = -((m_gridWidth - 1) * 0.5f * m_gridSpacing);
+		float startZ = -((m_gridHeight - 1) * 0.5f * m_gridSpacing);
+
 		for (size_t i = 0; i < m_meshes.size(); ++i) {
 			vulkan::UniformBufferObject ubo{};
 
-			ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(static_cast<float>(i) * 1.0f - 6.f, 0.0f, i % 2 ? -0.6f : 0.6f))
+			int col = static_cast<int>(i) % m_gridWidth;
+			int row = static_cast<int>(i) / m_gridWidth;
+			glm::vec3 position(startX + col * m_gridSpacing, 0.0f, startZ + row * m_gridSpacing);
+
+			ubo.model = glm::translate(glm::mat4(1.0f), position)
 				* glm::rotate(glm::mat4(1.0f), angle, glm::vec3(1.0f, 0.0f, 1.0f));
 			ubo.view = glm::lookAt(
 				glm::vec3(0.0f, 15.0f, 0.0f),

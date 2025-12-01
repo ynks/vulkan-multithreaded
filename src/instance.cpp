@@ -9,6 +9,14 @@ module vulkan.instance;
 
 namespace vulkan {
 
+#ifdef _WIN32
+#ifdef _NDEBUG
+#define NDEBUG
+#else
+#undef NDEBUG
+#endif
+#endif
+
 #ifdef NDEBUG
 constexpr bool VALIDATION_LAYERS_ENABLED = false;
 #else
