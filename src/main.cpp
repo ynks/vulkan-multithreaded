@@ -1,6 +1,8 @@
 #include <memory>
 #include <print>
 #include <cstdlib>
+#include <atomic>
+#include <thread>
 #include <vulkan/vulkan_raii.hpp>
 
 #define GLM_ENABLE_EXPERIMENTAL
@@ -16,6 +18,7 @@ import vulkan.pipeline;
 import vulkan.commandpool;
 import vulkan.commandbuffer;
 import vulkan.mesh;
+import thread_pool;
 
 float rotation = 0.0f;
 
@@ -36,11 +39,13 @@ private:
 	std::vector<std::unique_ptr<vulkan::Mesh>> m_meshes;
 
 	std::vector<vulkan::CommandBuffer> m_commandBuffers;
+	std::vector<std::vector<vulkan::CommandBuffer>> m_secondaryCommandBuffers;
 	std::vector<vk::raii::Semaphore> m_presentCompleteSemaphores;
 	std::vector<vk::raii::Semaphore> m_renderFinishedSemaphores;
 	std::vector<vk::raii::Fence> m_drawFences;
 	uint32_t m_currentFrame = 0;
 
+	toast::ThreadPool m_threadPool;
 	bool m_framebufferResized = false;
 
 	void initVulkan() {
@@ -60,6 +65,7 @@ private:
 		}
 		CreateSyncObjects();
 		CreateCommandBuffers();
+		m_threadPool.Init(4);
 	}
 
 	void CreateSyncObjects() {
@@ -67,6 +73,7 @@ private:
 		m_presentCompleteSemaphores.reserve(imageCount);
 		m_renderFinishedSemaphores.reserve(imageCount);
 		m_drawFences.reserve(imageCount);
+		m_secondaryCommandBuffers.resize(imageCount);
 		
 		for (uint32_t i = 0; i < imageCount; ++i) {
 			m_presentCompleteSemaphores.emplace_back(m_device->get(), vk::SemaphoreCreateInfo());
@@ -78,8 +85,9 @@ private:
 	void CreateMesh() {
 		m_meshes.clear();
 		// Create a couple of meshes: a cube and a quad
-		m_meshes.emplace_back(std::make_unique<vulkan::Mesh>(vulkan::Mesh::CreateCube()));
-		m_meshes.emplace_back(std::make_unique<vulkan::Mesh>(vulkan::Mesh::CreateCube()));
+		while (m_meshes.size() <= 13) {
+			m_meshes.emplace_back(std::make_unique<vulkan::Mesh>(vulkan::Mesh::CreateCube()));
+		}
 	}
 
 	void CreateCommandBuffers() {
@@ -90,6 +98,9 @@ private:
 
 	void drawFrame() {
 		[[maybe_unused]] auto waitResult = m_device->get().waitForFences(*m_drawFences[m_currentFrame], vk::True, std::numeric_limits<uint64_t>::max());
+		
+		// Clear previous frame's secondary buffers now that fence has signaled
+		m_secondaryCommandBuffers[m_currentFrame].clear();
 		
 		auto [result, image_index] = m_swapchain->get().acquireNextImage(std::numeric_limits<uint64_t>::max(), *m_presentCompleteSemaphores[m_currentFrame], nullptr);
 
@@ -103,13 +114,87 @@ private:
 
 		m_device->get().resetFences(*m_drawFences[m_currentFrame]);
 
-		// Record command buffer using lambda
+		// Update uniform buffers
+		rotation += 1.f * 0.166f;
+		float angle = glm::radians(rotation);
+		
+		for (size_t i = 0; i < m_meshes.size(); ++i) {
+			vulkan::UniformBufferObject ubo{};
+
+			ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(static_cast<float>(i) * 1.0f - 6.f, 0.0f, i % 2 ? -0.6f : 0.6f))
+				* glm::rotate(glm::mat4(1.0f), angle, glm::vec3(1.0f, 0.0f, 1.0f));
+			ubo.view = glm::lookAt(
+				glm::vec3(0.0f, 15.0f, 0.0f),
+				glm::vec3(0.0f, 0.0f, 0.0f),
+				glm::vec3(0.0f, 0.0f, 1.0f)
+			);
+			auto extent = vulkan::Swapchain::extent();
+			float aspectRatio = extent.width / (float)extent.height;
+			ubo.proj = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 100.0f);
+			ubo.proj[1][1] *= -1;
+			m_meshes[i]->UpdateUniformBuffer(m_currentFrame, ubo);
+		}
+
+		// Record secondary command buffers in parallel (one per thread per mesh)
+		std::atomic<size_t> completedCount{0};
+		std::vector<vulkan::CommandBuffer> secondaryBuffers;
+		secondaryBuffers.reserve(m_meshes.size());
+		std::mutex buffersMutex;
+		
+		for (size_t meshIndex = 0; meshIndex < m_meshes.size(); ++meshIndex) {
+			m_threadPool.QueueJob([this, meshIndex, &completedCount, &secondaryBuffers, &buffersMutex]() {
+				// Each thread gets its own command pool
+				auto& threadPool = vulkan::CommandPool::GetForCurrentThread();
+				
+				// Allocate a new secondary command buffer for this mesh on this thread
+				auto secondaryCmd = threadPool.AllocateBuffer(vk::CommandBufferLevel::eSecondary);
+				
+				// Inheritance info for secondary command buffer
+				vk::Format swapchainFormat = vulkan::Swapchain::format();
+				vk::CommandBufferInheritanceRenderingInfo inheritanceRenderingInfo{
+					.colorAttachmentCount = 1,
+					.pColorAttachmentFormats = &swapchainFormat,
+					.rasterizationSamples = vk::SampleCountFlagBits::e1
+				};
+
+				vk::CommandBufferInheritanceInfo inheritanceInfo{
+					.pNext = &inheritanceRenderingInfo
+				};
+
+				auto flags = vk::CommandBufferUsageFlagBits::eRenderPassContinue;
+				
+				secondaryCmd.Record([&](vk::raii::CommandBuffer& cmd) {
+					// Bind pipeline and set viewport/scissor
+					cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, m_pipeline->get());
+					auto extent = vulkan::Swapchain::extent();
+					cmd.setViewport(0, vk::Viewport(0.0f, 0.0f, static_cast<float>(extent.width), static_cast<float>(extent.height), 0.0f, 1.0f));
+					cmd.setScissor(0, vk::Rect2D({0, 0}, extent));
+
+					// Draw this mesh
+					m_meshes[meshIndex]->BindAndDraw(cmd, m_pipeline->GetPipelineLayout(), m_currentFrame);
+				}, flags, &inheritanceInfo);
+
+				{
+					std::lock_guard<std::mutex> lock(buffersMutex);
+					secondaryBuffers.push_back(std::move(secondaryCmd));
+				}
+
+				completedCount.fetch_add(1);
+			});
+		}
+
+		// Wait for all secondary command buffers to be recorded
+		while (completedCount.load() < m_meshes.size()) {
+			std::this_thread::yield();
+		}
+
+		// Record primary command buffer
 		m_commandBuffers[m_currentFrame].Record([&](vk::raii::CommandBuffer& cmd) {
 			// Transition image for rendering
 			vulkan::CommandBuffer::TransitionImageLayout(
 				cmd,
 				vulkan::Swapchain::image(image_index),
-				vk::ImageLayout::eUndefined,  // First frame or after present
+				vk::ImageLayout::eUndefined,
 				vk::ImageLayout::eColorAttachmentOptimal,
 				{},
 				vk::AccessFlagBits2::eColorAttachmentWrite,
@@ -128,47 +213,22 @@ private:
 			};
 
 			vk::RenderingInfo renderingInfo{
+				.flags = vk::RenderingFlagBits::eContentsSecondaryCommandBuffers,
 				.renderArea = { .offset = {0, 0}, .extent = vulkan::Swapchain::extent() },
 				.layerCount = 1,
 				.colorAttachmentCount = 1,
 				.pColorAttachments = &colorAttachment
 			};
 
-			// Update uniform buffer with proper matrices
-			rotation += 1.f * 0.166f;
-			float angle = glm::radians(rotation);
-			
-			for (size_t i = 0; i < m_meshes.size(); ++i) {
-				vulkan::UniformBufferObject ubo{};
-
-				ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(static_cast<float>(i) * 2.0f - 1.f, 0.0f, 0.0f))
-					* glm::rotate(glm::mat4(1.0f), angle, glm::vec3(1.0f, 0.0f, 1.0f));
-				// Shared view
-				ubo.view = glm::lookAt(
-					glm::vec3(0.0f, 4.0f, 0.0f),
-					glm::vec3(0.0f, 0.0f, 0.0f),
-					glm::vec3(0.0f, 0.0f, 1.0f)
-				);
-				// Shared projection
-				auto extent = vulkan::Swapchain::extent();
-				float aspectRatio = extent.width / (float)extent.height;
-				ubo.proj = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 10.0f);
-				ubo.proj[1][1] *= -1;
-				m_meshes[i]->UpdateUniformBuffer(m_currentFrame, ubo);
-			}
-
 			cmd.beginRendering(renderingInfo);
 
-			// Bind pipeline and set dynamic state
-			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, m_pipeline->get());
-			auto extent2 = vulkan::Swapchain::extent();
-			cmd.setViewport(0, vk::Viewport(0.0f, 0.0f, static_cast<float>(extent2.width), static_cast<float>(extent2.height), 0.0f, 1.0f));
-			cmd.setScissor(0, vk::Rect2D({0, 0}, extent2));
-
-			// Draw all meshes
-			for (auto& mesh : m_meshes) {
-				mesh->BindAndDraw(cmd, m_pipeline->GetPipelineLayout(), m_currentFrame);
+			// Execute secondary command buffers
+			std::vector<vk::CommandBuffer> secondaryCmds;
+			secondaryCmds.reserve(m_meshes.size());
+			for (auto& secondaryCmd : secondaryBuffers) {
+				secondaryCmds.push_back(*secondaryCmd.get());
 			}
+			cmd.executeCommands(secondaryCmds);
 
 			cmd.endRendering();
 
@@ -201,6 +261,9 @@ private:
 			.pSignalSemaphores = &signalSemaphore
 		};
 		m_device->queue().submit(submitInfo, *m_drawFences[m_currentFrame]);
+
+		// Store secondary buffers for this frame so they live until fence signals
+		m_secondaryCommandBuffers[m_currentFrame] = std::move(secondaryBuffers);
 
 		// Present
 		vk::SwapchainKHR swapchain = *m_swapchain->get();
@@ -235,6 +298,13 @@ private:
 		}
 
 		m_device->get().waitIdle();
+		
+		// Clear all secondary command buffers before destroying thread pool
+		for (auto& buffers : m_secondaryCommandBuffers) {
+			buffers.clear();
+		}
+		
+		m_threadPool.Destroy();
 	}
 };
 

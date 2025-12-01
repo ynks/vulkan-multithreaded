@@ -20,9 +20,12 @@ public:
 
 	/// @brief Execute a recording function with automatic begin/end
 	template<typename Func>
-	void Record(Func&& recordFunc, vk::CommandBufferUsageFlags flags = {}) {
+	void Record(Func&& recordFunc, vk::CommandBufferUsageFlags flags = {}, const vk::CommandBufferInheritanceInfo* inheritanceInfo = nullptr) {
 		m_buffer.reset();
-		m_buffer.begin(vk::CommandBufferBeginInfo{ .flags = flags });
+		m_buffer.begin(vk::CommandBufferBeginInfo{ 
+			.flags = flags,
+			.pInheritanceInfo = inheritanceInfo
+		});
 		recordFunc(m_buffer);
 		m_buffer.end();
 	}
